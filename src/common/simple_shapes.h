@@ -246,6 +246,7 @@ struct shape_maker {
 		////////////////////////////////////////////////////////////
 
 		s.positions.resize(3 * (2 * resolution + 2));
+		s.normals.resize(3 * (2 * resolution + 2));
 
 		float radius = 1.0;
 		float angle;
@@ -260,6 +261,9 @@ struct shape_maker {
 			s.positions[vertexoffset] = radius * std::cos(angle);
 			s.positions[vertexoffset + 1] = 0.0;
 			s.positions[vertexoffset + 2] = radius * std::sin(angle);
+			s.normals[vertexoffset] = std::cos(angle);
+			s.normals[vertexoffset + 1] = 0.0;
+			s.normals[vertexoffset + 2] = std::sin(angle);
 			vertexoffset += 3;
 		}
 
@@ -271,17 +275,27 @@ struct shape_maker {
 			s.positions[vertexoffset] = radius *  std::cos(angle);
 			s.positions[vertexoffset + 1] = 2.0;
 			s.positions[vertexoffset + 2] = radius *  std::sin(angle);
+			s.normals[vertexoffset] = std::cos(angle);
+			s.normals[vertexoffset + 1] = 0.0;
+			s.normals[vertexoffset + 2] = std::sin(angle);
 			vertexoffset += 3;
 		}
 
 		s.positions[vertexoffset] = 0.0;
 		s.positions[vertexoffset + 1] = 0.0;
 		s.positions[vertexoffset + 2] = 0.0;
+		s.normals[vertexoffset] = 0.0;
+		s.normals[vertexoffset + 1] = -1.0;
+		s.normals[vertexoffset + 2] = 0.0;
+
 		vertexoffset += 3;
 
 		s.positions[vertexoffset] = 0.0;
 		s.positions[vertexoffset + 1] = 2.0;
 		s.positions[vertexoffset + 2] = 0.0;
+		s.normals[vertexoffset] = 0.0;
+		s.normals[vertexoffset + 1] = 1.0;
+		s.normals[vertexoffset + 2] = 0.0;
 
 		for (int i = 0; i < s.positions.size(); i += 3) {
 			s.colors.push_back(r);
