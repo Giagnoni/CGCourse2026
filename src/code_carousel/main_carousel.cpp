@@ -161,7 +161,6 @@ void key_callback(GLFWwindow * window, int key, int scancode, int action, int mo
 		curr_tb = 0;
 
 		proj = glm::perspective(glm::radians(45.f), 1.f, 1.f, 10.f);
-
 		view = glm::lookAt(glm::vec3(0, 1.f, 1.5), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0, 1.f, 0.f));
 		glUniformMatrix4fv(basic_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
 		glUniformMatrix4fv(basic_shader["uView"], 1, GL_FALSE, &view[0][0]);

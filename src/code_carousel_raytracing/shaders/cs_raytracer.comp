@@ -8,8 +8,34 @@ uniform mat4 uViewInv;
 uniform mat4 uModelInv;
 uniform vec3 uLDir;
 
-uniform sampler2D uMattoni;
+uniform vec4 terrain_rect;
+uniform int n_trees;
+uniform int n_lamps;
+uniform int n_cars;
+uniform int n_cameramen;
 
+PhongMaterial default_material;
+
+struct stick_object {
+    vec3  pos;
+    float height; 
+};
+
+layout(std430, binding = 0) buffer trees_data {
+    stick_object trees[];
+};
+
+layout(std430, binding = 1) buffer lamps_data {
+    stick_object lamps[];
+};
+
+layout(std430, binding = 2) buffer cars_data {
+    mat4 cars[];
+};
+
+layout(std430, binding = 3) buffer cameramen_data {
+    mat4 cameramen[];
+};
 
 mat3 create_axes(in vec3 x_axis, in vec3 norm){
     mat3 axes;
@@ -41,9 +67,8 @@ struct Quad{
     PhongMaterial material; 
 };
 
-Sphere s0;
-Quad q0;
-
+ 
+Quad terrain;
 
 struct HitInfo {
     float t;
@@ -119,9 +144,7 @@ bool hit_quad( Ray r,  Quad q, out HitInfo nfo){
     nfo.hit = true;
     
    
-    vec2 uv =   (intPoint.xy- (-q.size/2.0))  / q.size;
-    vec3 c = texture(uMattoni,uv).xyz;
-    nfo.m.diffuse_color = c;
+    nfo.m.diffuse_color = vec3(1,0,0);
     nfo.m.specular_color = vec3(0);
     
 
@@ -138,10 +161,26 @@ HitInfo hit_scene(  Ray r,   float m, float M ){
  nfoT.t = M;
  r.orig += m*r.dir;
 
-// test all the elments of the scene
+// test all the elements of the scene
  HitInfo cnfo;
- if ( hit_sphere( r, s0,cnfo)  ) nfoT = closest(cnfo,nfoT); 
- if ( hit_quad( r, q0,cnfo)  ) nfoT = closest(cnfo,nfoT); 
+
+ for (int i = 0; i < n_trees; ++i)
+  if ( hit_sphere( r, Sphere(trees[i].pos,trees[i].height,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+
+ for (int i = 0; i < n_lamps; ++i)
+  if ( hit_sphere( r, Sphere(lamps[i].pos,trees[i].height,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+
+ for (int i = 0; i < n_cars; ++i){ 
+  vec3 car_pos = cars[i][3].xyz;
+  if ( hit_sphere( r, Sphere(car_pos,1.0,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+ }
+
+ for (int i = 0; i < n_cameramen; ++i){ 
+  vec3 cam_pos = cameramen[i][3].xyz;
+  if ( hit_sphere( r, Sphere(cam_pos,1.0,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+ }
+
+ if ( hit_quad( r, terrain,cnfo)  ) nfoT = closest(cnfo,nfoT); 
  
  nfoT.hit =  (nfoT.t < M); 
  return nfoT;
@@ -150,7 +189,8 @@ HitInfo hit_scene(  Ray r,   float m, float M ){
 shared vec3 samples[16];
 void main(void) 
 { 
-   PhongMaterial m = PhongMaterial( uAmbientColor,uDiffuseColor,uSpecularColor,uEmissiveColor,uShininess);
+    
+   default_material = PhongMaterial( uAmbientColor,uDiffuseColor,uSpecularColor,uEmissiveColor,uShininess);
 
    ivec2 pix = ivec2(gl_GlobalInvocationID.xy/4);
 
@@ -159,13 +199,12 @@ void main(void)
 
    imageStore(imgOutput, pix, vec4(0.0,0.0,0.0,1.0) );
 
-   /* create a sphere */
-   s0.center = vec3(0,3,0);
-   s0.radius = 1.0;
-   s0.material = m;
 
    /* create a quad */
-   q0 =  Quad(create_axes(vec3(1.0,0.0,0.0),vec3(0.0,1.0,0.0)),vec3(0.0,0.0,0.0),vec2(4,4),m);
+
+   vec2 sz = terrain_rect.zw+terrain_rect.xy;
+   vec2 center = (terrain_rect.xy + terrain_rect.zw)*0.5;
+   terrain =  Quad(create_axes(vec3(1.0,0.0,0.0),vec3(0.0,1.0,0.0)),vec3(center.x,0.0,center.y),vec2(sz.x,sz.y),default_material);
 
    
    Ray r;
@@ -185,12 +224,12 @@ void main(void)
    r.dir  = normalize((uModelInv* uViewInv * (p1-p0)).xyz);
    vec3 l_dir = normalize((uModelInv* vec4(uLDir,1.0)).xyz);
 
-   HitInfo hi = hit_scene(r,0.0,100);
+   HitInfo hi = hit_scene(r,0.0,1000);
    
    samples[id_sample] = vec3(0.0);
    if(hi.hit){
-        vec3 c = phong(l_dir,-r.dir,hi.n,hi.m,uLightColor);     
-         samples[id_sample] = c;
+        vec3 c = phong(l_dir,-r.dir,hi.n,hi.m,uLightColor);    
+        samples[id_sample] = c;
         }
 
     barrier(); // Ensure all threads have written their results before proceeding
@@ -207,4 +246,5 @@ void main(void)
 	    // Write the averaged color to the output image
 	    imageStore(imgOutput, pix, vec4(finalColor,1.0));
      }
+      
 } 

@@ -49,19 +49,11 @@ and set the path properly.
 
 int width, height;
 
-#define RASTERIZATION 0
-#define RAYTRACING 1
-
-int render_mode;
-
 /* light direction in world space*/
 glm::vec4 Ldir;
 
-/* one trackball to manipulate the scene, one for the light direction */
-trackball tb[2];
-
-/* which trackball is currently used */
-int curr_tb;
+/* trackball to manipulate the scene */
+trackball tb;
 
 /* projection matrix*/
 glm::mat4 proj;
@@ -70,12 +62,12 @@ glm::mat4 proj;
 glm::mat4 view;
 
 /* variables for storing the cone and cylinder  */
-renderable r_sphere, r_quad, r_cone,r_cyl;
+renderable  r_quad;
 
 /* callback function called when the mouse is moving */
 static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
 {
-	tb[curr_tb].mouse_move(proj, view, xpos, ypos);
+	tb.mouse_move(proj, view, xpos, ypos);
 }
 
 /* callback function called when a mouse button is pressed */
@@ -87,56 +79,23 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		double xpos, ypos;
 		glfwGetCursorPos(window, &xpos, &ypos);
-		if (mods&GLFW_MOD_CONTROL) {
-
-			/* this is just a piece of code to show how to find what point or object 
-			 is intersected by the view ray passing through the clicke pixel.
-			 Does not do anything other the printing out the value found
-			 */
-
-			// from viewport to world space
-			float depthvalue;
-			glReadPixels((int)xpos, height - (int)ypos, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depthvalue);
-			glm::vec4 ndc = glm::vec4(-1.f + xpos / float( width) * 2, -1.f + (height - ypos) / float(height) * 2.f, -1.f + depthvalue*2.f, 1.f);
-			glm::vec4 hit1 = glm::inverse(proj*view)*ndc;
-			hit1 /= hit1.w;
-			std::cout << " hit point " << glm::to_string(hit1) << std::endl;
-
-			// from viewport to world space with unProject
-			glm::vec3 hit = glm::unProject(glm::vec3(xpos, height - ypos, depthvalue), view, proj, glm::vec4(0, 0, width, height));
-			std::cout << " hit point " << glm::to_string(hit) << std::endl;
-
-			// read back the color from the color buffer and compute the index
-			GLubyte colu[4];
-			glReadPixels(xpos, height - ypos, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, &colu[0]);
-			std::cout << " rgba  " << (int)colu[0] << " " << (int)colu[1] << " " << (int)colu[2] << " " << (int)colu[3] << std::endl;
-
-			int id = colu[0] + (colu[1] << 8) + (colu[2] << 16);
-			std::cout << "selected ID: " << id << std::endl;
-
-			tb[0].set_center_radius(hit1, 2.f);
-		}
-		else
-			tb[curr_tb].mouse_press(proj, view, xpos, ypos);
+		tb.mouse_press(proj, view, xpos, ypos);
 	}
 	else
 		if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-			tb[curr_tb].mouse_release();
+			tb.mouse_release();
 		}
 }
 
 /* callback function called when the mouse wheel is rotated */
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	if (curr_tb == 0)
-		tb[0].mouse_scroll(xoffset, yoffset);
+	tb.mouse_scroll(xoffset, yoffset);
 }
 
 /* callback function called when a key is pressed */
 void keyboard_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-	/* every time any key is presses it switch from controlling trackball tb[0] to tb[1] and viceversa */
-	if (action == GLFW_PRESS && ((mods & GLFW_MOD_CONTROL)==0))
-		curr_tb = 1 - curr_tb;
+
 }
 
 /* callback function called when the windows is resized */
@@ -160,32 +119,18 @@ void gui_setup() {
 }
 
 
-/* draw the arrow */
-void draw_arrow( matrix_stack & stack, shader used_program) {
-	r_cyl.bind();
-
-	stack.push();
-	stack.mult(glm::scale(glm::mat4(1.f), glm::vec3(0.03, 0.75, 0.03)));
- 	glUniformMatrix4fv(used_program["uModel"], 1, GL_FALSE, &stack.m()[0][0]);
-	glUniform1i(used_program["uShadingMode"],1);
-	glUniform3f(used_program["uAmbientColor"], 0.15f, 0.15f, 0.15f);
-	glUniform3f(used_program["uDiffuseColor"], 0.f,0.3f,0.8f);
-	glUniform3f(used_program["uSpecularColor"], 0.f, 0.0f, 0.0f);
-	glDrawElements(r_cyl().mode, r_cyl().count, r_cyl().itype, 0);
-	stack.pop();
-
-	stack.push();
-	r_cone.bind();
-	stack.mult(glm::translate(glm::mat4(1.f), glm::vec3(0.0, 1.5, 0.0)));
-	stack.mult(glm::scale(glm::mat4(1.f), glm::vec3(0.07, 0.2, 0.07)));
-	glUniform3f(used_program["uDiffuseColor"], 0.1f, 0.8f, 0.2f);
-	glUniformMatrix4fv(used_program["uModel"], 1, GL_FALSE, &stack.m()[0][0]);
-	glDrawElements(r_cone().mode, r_cone().count, r_cone().itype, 0);
-	stack.pop();
-}
 
 int main(int argc , char ** argv)
 {
+	race r;
+
+	carousel_loader::load("small_test.svg", "terrain_256.png", r);
+
+	//add 10 cars
+	for (int i = 0; i < 10; ++i)
+		r.add_car();
+
+
 	GLFWwindow* window;
 
 	/* Initialize the library */
@@ -196,7 +141,7 @@ int main(int argc , char ** argv)
 	/* Create a windowed mode window and its OpenGL context */
 	width = 1024;
 	height = 1024;
-	window = glfwCreateWindow(width, height, "code_13_htbrid_renderer", NULL, NULL);
+	window = glfwCreateWindow(width, height, "code_carousel_raytracing", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();
@@ -222,7 +167,7 @@ int main(int argc , char ** argv)
 		glfwTerminate();
 		return EXIT_FAILURE;
 	}
-
+	check_gl_errors(__LINE__, __FILE__);
 
 	// Variabili per i limiti
 	GLuint maxWorkGroupSize[3];
@@ -267,22 +212,15 @@ int main(int argc , char ** argv)
 	);
 
 
-	/* create a  sphere   centered at the origin with radius 1*/
-	r_sphere = shape_maker::sphere(2);
-	
+
 	/* create a quad */
 	r_quad = shape_maker::quad();
 
-	/* create a cone (for the tip of the arrow) */
-	r_cone = shape_maker::cone(1.f, 1.f, 10);
-
-	/* create a cylinder (for the body of the arrow) */
-	r_cyl = shape_maker::cylinder(10);
-
-
+	check_gl_errors(__LINE__, __FILE__);
 	/* Transformation to setup the point of view on the scene */
-	proj = glm::perspective(glm::radians(40.f), width / float(height), 2.f, 20.f);
-	view = glm::lookAt(glm::vec3(0, 7, 6.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
+	proj = glm::perspective(glm::radians(45.f), 1.f, 1.f, 1000.f);
+	view = glm::lookAt(glm::vec3(0, 1.f, 1.5), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0, 1.f, 0.f));
+
 
 	glm::mat4 proj_inv = glm::inverse(proj);
 	glm::mat4 view_inv = glm::inverse(view);
@@ -290,7 +228,7 @@ int main(int argc , char ** argv)
 	/* Light direction is initialized as +Y */
 	Ldir = glm::vec4(0, 1, 0,0);
 
-	render_mode = RASTERIZATION;
+	 
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
@@ -308,8 +246,76 @@ int main(int argc , char ** argv)
 	shader raytracer;
 	raytracer.create_program(join("./shaders/directives.glsl", "./shaders/phong_material.glsl", "./shaders/phong.glsl","./shaders/cs_raytracer.comp"));
 	
-	texture mattoni;
-	mattoni.load("./textures/brick_wall2-diff-512.png", 1);
+	check_gl_errors(__LINE__, __FILE__);
+	// pass the data to the compute shader
+
+	 // THE TERRAIN
+	glUseProgram(raytracer.program);
+	glm::vec4 terrain_rect_xz = r.ter().rect_xz;
+	glUniform4fv(raytracer["terrain_rect"], 1, &terrain_rect_xz[0]);
+
+	// pass a Phong material
+	float a_color[3] = { 0.45f,0.15f,0.15f };
+	float d_color[3] = { 0.5f,0.1f,0.2f };
+	float s_color[3] = { 0.0f,0.0f,0.0f };
+	float e_color[3] = { 0.5f,0.1f,0.2f };
+	float l_color[3] = { 0.9f,0.9f,0.9f };
+	float shininess = 1.0;
+	glUniform3fv(raytracer["uDiffuseColor"], 1, &d_color[0]);
+	glUniform3fv(raytracer["uAmbientColor"], 1, &a_color[0]);
+	glUniform3fv(raytracer["uSpecularColor"], 1, &s_color[0]);
+	glUniform1f(raytracer["uShininess"], shininess);
+	glUniform3fv(raytracer["uLightColor"], 1, &l_color[0]);
+
+
+
+	// THE TREES
+	std::vector<stick_object> trees = r.trees();
+
+	GLuint ssbo_trees;
+	glGenBuffers(1, &ssbo_trees);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_trees);
+
+	// Allochiamo e carichiamo i dati
+	glBufferData(GL_SHADER_STORAGE_BUFFER,
+		trees.size() * sizeof(stick_object),
+		&trees[0],
+		GL_STATIC_DRAW);
+
+	// Bind al binding point 0
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, ssbo_trees);
+
+	glUniform1i(raytracer["n_trees"],trees.size());
+
+	// THE LAMPS
+	std::vector<stick_object> lamps = r.lamps();
+
+	GLuint ssbo_lamps;
+	glGenBuffers(1, &ssbo_lamps);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_lamps);
+
+	// Allochiamo e carichiamo i dati
+	glBufferData(GL_SHADER_STORAGE_BUFFER,
+		lamps.size() * sizeof(stick_object),
+		&lamps[0],
+		GL_STATIC_DRAW);
+
+	// Bind al binding point 0
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ssbo_lamps);
+
+	glUniform1i(raytracer["n_lamps"], r.lamps().size());
+	glUniform1i(raytracer["n_cars"], r.cars().size());
+	glUniform1i(raytracer["n_cameramen"], r.cameramen().size());
+
+	check_gl_errors(__LINE__, __FILE__);
+		
+	GLuint ssbo_cars;
+	glGenBuffers(1, &ssbo_cars);
+
+	GLuint ssbo_cameramen;
+	glGenBuffers(1, &ssbo_cameramen);
+
+	check_gl_errors(__LINE__, __FILE__);
 
 	// create a texture    
 	unsigned int texture;
@@ -334,23 +340,20 @@ int main(int argc , char ** argv)
 	/* set the viewport  */
 	glViewport(0, 0, width, height);
 
-	glUseProgram(basic_shader.program);
-	glUniformMatrix4fv(basic_shader["uProj"], 1, GL_FALSE, &proj[0][0]);
-	glUniformMatrix4fv(basic_shader["uView"], 1, GL_FALSE, &view[0][0]);
-	glUniformMatrix4fv(basic_shader["uModel"], 1, GL_FALSE, &glm::mat4(1.f)[0][0]);
-	glUniform3f(basic_shader["uColor"], 1.0, 0.0, 0.0);
 
 	/* set the trackballs position */
-	tb[0].set_center_radius(glm::vec3(0, 0, 0), 2.f);
-	tb[1].set_center_radius(glm::vec3(0, 0, 0), 2.f);
-	curr_tb = 0;
+	tb.set_center_radius(glm::vec3(0, 0, 0), 1.f);
 
 	
 	glActiveTexture(GL_TEXTURE0);
 	
 
 	glEnable(GL_DEPTH_TEST);
-	glUseProgram(basic_shader.program);
+
+
+	r.start(11, 0, 0, 600);
+	r.update();
+
 /* Loop until the user closes the window */
 	int nf = 0;
 	int cstart = clock();
@@ -362,48 +365,82 @@ int main(int argc , char ** argv)
 			cstart = clock();
 		}
 		nf++;
-		// light direction
-		/* Update the light direction using the trackball tb[1]
-		   It's just a rotation
-		*/
-		Ldir = tb[1].matrix() * glm::vec4(0, 1, 0, 0);
+		r.update();
+		glUseProgram(raytracer.program);
 
-			
+		// CARS
+		std::vector<glm::mat4> frames;
+		for (unsigned int i = 0; i < r.cars().size(); ++i)
+			frames.push_back(r.cars()[i].frame);
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_cars);
+
+		glBufferData(GL_SHADER_STORAGE_BUFFER,
+			frames.size() * sizeof(glm::mat4),
+			&frames[0],
+			GL_STATIC_DRAW);
+
+		// Bind al binding point 1
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER,2, ssbo_cars);
+
+
+		// CAMERAMEN
+		std::vector<glm::mat4> frames_cameramen;
+		for (unsigned int i = 0; i < r.cameramen().size(); ++i)
+			frames_cameramen.push_back(r.cameramen()[i].frame);
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, ssbo_cameramen);
+
+		glBufferData(GL_SHADER_STORAGE_BUFFER,
+			frames_cameramen.size() * sizeof(glm::mat4),
+			&frames_cameramen[0],
+			GL_STATIC_DRAW);
+
+		// Bind al binding point 1
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, ssbo_cameramen);
+
+
 		/* Render here */
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	
 		stack.load_identity();
 
 		stack.push();
-		stack.mult(tb[0].matrix());
+		stack.mult(tb.matrix());
 
-		if (render_mode == RAYTRACING) {
-			glUseProgram(raytracer.program);
+		// scaling
+		float s = 1.f / r.bbox().diagonal();
+		glm::vec3 c = r.bbox().center();
 
-			glUniformMatrix4fv(raytracer["uProjInv"], 1, GL_FALSE, &proj_inv[0][0]);
-			glUniformMatrix4fv(raytracer["uViewInv"], 1, GL_FALSE, &view_inv[0][0]);
-			glm::mat4 stackInv = glm::inverse(stack.m());
-			glUniformMatrix4fv(raytracer["uModelInv"], 1, GL_FALSE, &stackInv[0][0]);
+		stack.mult(glm::scale(glm::mat4(1.f), glm::vec3(s)));
+		stack.mult(glm::translate(glm::mat4(1.f), -c));
+
+		 
+
+		glUniformMatrix4fv(raytracer["uProjInv"], 1, GL_FALSE, &proj_inv[0][0]);
+		glUniformMatrix4fv(raytracer["uViewInv"], 1, GL_FALSE, &view_inv[0][0]);
+		glm::mat4 stackInv = glm::inverse(stack.m());
+		glUniformMatrix4fv(raytracer["uModelInv"], 1, GL_FALSE, &stackInv[0][0]);
 
 
-			// dispatch 16x16x1 workgorups
-			glDispatchCompute(512   , 512  , 1);
-			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+		// dispatch 16x16x1 workgorups
+		glDispatchCompute(512   , 512  , 1);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 
-			/* draw  a FSQ with the texture stitched on it, to show
-			* the result of the compute shader
-			*/
-			glUseProgram(texture_shader.program);
-			glClearColor(0.0, 0.0, 0.0, 1);
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		/* draw  a FSQ with the texture stitched on it, to show
+		* the result of the compute shader
+		*/
+		glUseProgram(texture_shader.program);
+		glClearColor(0.0, 0.0, 0.0, 1);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			glBindTexture(GL_TEXTURE_2D, texture);
-			r_quad.bind();
-			glm::mat4 rot = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(1, 0.0, 0.0));
-			glUniformMatrix4fv(basic_shader["uModel"], 1, GL_FALSE, &rot[0][0]);
-			glDrawElements(r_quad().mode, r_quad().count, r_quad().itype, 0);
-		}
+		glBindTexture(GL_TEXTURE_2D, texture);
+		r_quad.bind();
+		glm::mat4 rot = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(1, 0.0, 0.0));
+		glUniformMatrix4fv(basic_shader["uModel"], 1, GL_FALSE, &rot[0][0]);
+		glDrawElements(r_quad().mode, r_quad().count, r_quad().itype, 0);
+		 
 	
 		stack.pop();
 
