@@ -1,12 +1,12 @@
-add_executable(code_carousel
-    main_carousel.cpp
+add_executable(code_carousel_raytracing
+    main_carousel_raytracing.cpp
     ${IMGUI_SOURCES}       # <-- i .cpp di ImGui
 )
 
 find_package(OpenGL)
 
 # Include directories
-target_include_directories(code_carousel PRIVATE
+target_include_directories(code_carousel_raytracing PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}       # include locali
     ${IMGUI_INCLUDES}                 # <-- include di imgui + backend
 )
@@ -15,7 +15,7 @@ target_include_directories(code_carousel PRIVATE
 set_property(TARGET code_09_lighting_shading PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 
 # Link libraries
-target_link_libraries(code_carousel PRIVATE
+target_link_libraries(code_carousel_raytracing PRIVATE
     glfw
     glad
     glm
@@ -28,7 +28,7 @@ target_link_libraries(code_carousel PRIVATE
 file(GLOB_RECURSE COMMON_FILES
     ${CMAKE_SOURCE_DIR}/src/common/*
 )
-target_sources(code_carousel PRIVATE ${COMMON_FILES})
+target_sources(code_carousel_raytracing PRIVATE ${COMMON_FILES})
 source_group(TREE ${CMAKE_SOURCE_DIR}/src/common PREFIX "common" FILES ${COMMON_FILES})
 
 # ---------------------------
@@ -37,7 +37,7 @@ source_group(TREE ${CMAKE_SOURCE_DIR}/src/common PREFIX "common" FILES ${COMMON_
 file(GLOB_RECURSE SHADER_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/*
 )
-target_sources(code_carousel PRIVATE ${SHADER_FILES})
+target_sources(code_carousel_raytracing PRIVATE ${SHADER_FILES})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/shaders PREFIX "shaders" FILES ${SHADER_FILES})
 
 # ---------------------------
