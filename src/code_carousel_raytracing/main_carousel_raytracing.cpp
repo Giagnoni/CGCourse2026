@@ -123,7 +123,6 @@ void gui_setup() {
 int main(int argc , char ** argv)
 {
 	race r;
-
 	carousel_loader::load("small_test.svg", "terrain_256.png", r);
 
 	//add 10 cars
@@ -147,6 +146,7 @@ int main(int argc , char ** argv)
 		glfwTerminate();
 		return -1;
 	}
+
 	/* declare the callback functions on mouse events */
 	if (glfwRawMouseMotionSupported())
 		glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
@@ -169,25 +169,25 @@ int main(int argc , char ** argv)
 	}
 	check_gl_errors(__LINE__, __FILE__);
 
-	// Variabili per i limiti
+	
+	// Read the maximum number of thread per workgroup on every dimension
 	GLuint maxWorkGroupSize[3];
 	GLuint maxWorkGroupCount[3];
 	GLint maxWorkGroupInvocations;
 	check_gl_errors(__LINE__, __FILE__);
-	// Recupera il massimo numero di thread per workgroup in ciascuna dimensione
 	int workGroupSizes[3] = { 0 };
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &workGroupSizes[0]);
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &workGroupSizes[1]);
 	glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &workGroupSizes[2]);
 	check_gl_errors(__LINE__, __FILE__);
-	// Recupera il massimo numero di workgroup che puoi lanciare in ogni dimensione
-//	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_COUNT, maxWorkGroupCount);
+
 	std::cout << "Max Workgroup Count (X, Y, Z): "
 		<< workGroupSizes[0] << ", "
 		<< workGroupSizes[1] << ", "
 		<< workGroupSizes[2] << std::endl;
 	check_gl_errors(__LINE__, __FILE__);
-	// Recupera il numero massimo di invocazioni di thread per workgroup
+
+	// read the maximum number of invokations per workgroup 
 	glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &maxWorkGroupInvocations);
 	std::cout << "Max Workgroup Invocations: " << maxWorkGroupInvocations << std::endl;
 
@@ -200,20 +200,9 @@ int main(int argc , char ** argv)
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
 	/* end IMGUI initialization */
 
-	glEnable(GL_MULTISAMPLE);
-
 	printout_opengl_glsl_info();
 
-	/* load the shaders */
-	shader basic_shader;
-	basic_shader.create_program(
-		join("shaders/directives.glsl", "shaders/phong_material.glsl", "shaders/phong.glsl","shaders/basic.vert"),
-		join("shaders/directives.glsl", "shaders/phong_material.glsl", "shaders/phong.glsl","shaders/basic.frag")
-	);
-
-
-
-	/* create a quad */
+	/* create a quad for full screen wuad*/
 	r_quad = shape_maker::quad();
 
 	check_gl_errors(__LINE__, __FILE__);
@@ -242,6 +231,10 @@ int main(int argc , char ** argv)
 
 	shader texture_shader;
 	texture_shader.create_program("./shaders/texture.vert", "./shaders/texture.frag");
+
+
+
+
 
 	shader raytracer;
 	raytracer.create_program(join("./shaders/directives.glsl", "./shaders/phong_material.glsl", "./shaders/phong.glsl","./shaders/cs_raytracer.comp"));
@@ -326,13 +319,19 @@ int main(int argc , char ** argv)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 512, 512, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 1024, 1024, 0, GL_RGBA, GL_FLOAT, NULL);
 
 	/* this establishes that this texture is bound to the "image unit" 0.
 	*  If a compute shader read/write to  the image unit 0, it is reading/writing
 	* to this texture
 	*/
 	glBindImageTexture(0, texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RGBA32F);
+
+	glUseProgram(texture_shader.program);
+	glActiveTexture(GL_TEXTURE10);
+	glBindTexture(GL_TEXTURE_2D, texture);
+	glUniform1i(texture_shader["uColorImage"], 10);
+	glUseProgram(0);
 
 	check_gl_errors(__LINE__, __FILE__);
 
@@ -423,8 +422,7 @@ int main(int argc , char ** argv)
 		glUniformMatrix4fv(raytracer["uModelInv"], 1, GL_FALSE, &stackInv[0][0]);
 
 
-		// dispatch 16x16x1 workgorups
-		glDispatchCompute(512   , 512  , 1);
+		glDispatchCompute(1024   , 1024  , 1);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 
@@ -435,13 +433,10 @@ int main(int argc , char ** argv)
 		glClearColor(0.0, 0.0, 0.0, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glBindTexture(GL_TEXTURE_2D, texture);
+
 		r_quad.bind();
-		glm::mat4 rot = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(1, 0.0, 0.0));
-		glUniformMatrix4fv(basic_shader["uModel"], 1, GL_FALSE, &rot[0][0]);
 		glDrawElements(r_quad().mode, r_quad().count, r_quad().itype, 0);
-		 
-	
+ 
 		stack.pop();
 
 		/* draw the Graphical User Interface */

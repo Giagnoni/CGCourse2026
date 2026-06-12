@@ -162,22 +162,30 @@ HitInfo hit_scene(  Ray r,   float m, float M ){
  r.orig += m*r.dir;
 
 // test all the elements of the scene
+/*
+    Note: in this stub implementation  all the elements are represented with spheres and are
+    created online with the constructor.
+*/
  HitInfo cnfo;
-
+ PhongMaterial mt = default_material;
+ mt.diffuse_color = vec3(0,1,0);
  for (int i = 0; i < n_trees; ++i)
-  if ( hit_sphere( r, Sphere(trees[i].pos,trees[i].height,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+  if ( hit_sphere( r, Sphere(trees[i].pos,trees[i].height,mt),cnfo)  ) nfoT = closest(cnfo,nfoT); 
 
+ mt.diffuse_color = vec3(1,1,0);
  for (int i = 0; i < n_lamps; ++i)
-  if ( hit_sphere( r, Sphere(lamps[i].pos,trees[i].height,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+  if ( hit_sphere( r, Sphere(lamps[i].pos,trees[i].height,mt),cnfo)  ) nfoT = closest(cnfo,nfoT); 
 
+ mt.diffuse_color = vec3(0,1,1);
  for (int i = 0; i < n_cars; ++i){ 
   vec3 car_pos = cars[i][3].xyz;
-  if ( hit_sphere( r, Sphere(car_pos,1.0,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+  if ( hit_sphere( r, Sphere(car_pos,1.0,mt),cnfo)  ) nfoT = closest(cnfo,nfoT); 
  }
 
+ mt.diffuse_color = vec3(1,1,1);
  for (int i = 0; i < n_cameramen; ++i){ 
   vec3 cam_pos = cameramen[i][3].xyz;
-  if ( hit_sphere( r, Sphere(cam_pos,1.0,default_material),cnfo)  ) nfoT = closest(cnfo,nfoT); 
+  if ( hit_sphere( r, Sphere(cam_pos,1.0,mt),cnfo)  ) nfoT = closest(cnfo,nfoT); 
  }
 
  if ( hit_quad( r, terrain,cnfo)  ) nfoT = closest(cnfo,nfoT); 
@@ -200,29 +208,29 @@ void main(void)
    imageStore(imgOutput, pix, vec4(0.0,0.0,0.0,1.0) );
 
 
-   /* create a quad */
-
+   /* create a quad for the terrain */
    vec2 sz = terrain_rect.zw+terrain_rect.xy;
    vec2 center = (terrain_rect.xy + terrain_rect.zw)*0.5;
    terrain =  Quad(create_axes(vec3(1.0,0.0,0.0),vec3(0.0,1.0,0.0)),vec3(center.x,0.0,center.y),vec2(sz.x,sz.y),default_material);
 
    
+   /* create the ray */
    Ray r;
-
    vec2 rc  =vec2(gl_LocalInvocationID.x/4.0,gl_LocalInvocationID.y/4.0);
-
-   vec2 rpos = vec2(-1.0) +  2.0 * vec2(pix+rc)/vec2(512.0);
-
+   vec2 rpos = vec2(-1.0) +  2.0 * vec2(pix+rc)/vec2(gl_NumWorkGroups.x,gl_NumWorkGroups.y);
 
 
+   /* bring the ray in world space */  
    vec4 p0 = uProjInv * vec4(rpos,-1.0,1.0);
    p0 /= p0.w;
    vec4 p1 = uProjInv * vec4(rpos, 1.0,1.0);
    p1 /= p1.w;
-
    r.orig = (uModelInv*uViewInv * p0).xyz; 
    r.dir  = normalize((uModelInv* uViewInv * (p1-p0)).xyz);
+
+   /* bring the light in world space */
    vec3 l_dir = normalize((uModelInv* vec4(uLDir,1.0)).xyz);
+
 
    HitInfo hi = hit_scene(r,0.0,1000);
    
